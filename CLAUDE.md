@@ -51,13 +51,32 @@ uv run mypy .
 uv run pytest
 ```
 
+### Common Issues and Solutions
+
+#### MCP Projects (ch09-ch10)
+- **Error**: "MCP client initialization failed"
+  - Ensure `mcp_config.json` exists in project directory
+  - Verify MCP server paths in configuration are correct
+
+- **Async/await patterns**: MCP projects use `nest_asyncio` to enable nested event loops
+  - Main entry must use `asyncio.run()` for async functions
+  - Always cleanup MCP clients in finally blocks
+
+#### Ollama Integration
+- **Error**: "Model not found" or connection errors
+  - Verify Ollama is running: Check that Ollama service is active
+  - Pull required model: `ollama pull qwen2.5:7b` or `ollama pull qwen3:8b`
+  - Common models used: `qwen2.5:7b`, `qwen3:8b`, `llama3:8b`
+
 ## Architecture Overview
 
 ### Project Structure Pattern
 Most chapters follow this structure:
 - `main.py` - Entry point and CLI interface
-- `pyproject.toml` - Dependencies and project configuration
-- `src/` - Core implementation modules (in more complex projects)
+- `pyproject.toml` - Dependencies and project configuration (using uv package manager)
+- `src/` - Core implementation modules (in more complex projects like ch11)
+- `README.md` - Chapter-specific instructions and explanations
+- `.env` - Environment variables (API keys, optional depending on project)
 
 ### Key Architectural Patterns
 
@@ -73,15 +92,29 @@ Most chapters follow this structure:
 - Memory persistence with checkpointers
 
 #### 3. MCP (Model Context Protocol) Integration (ch09-ch10)
-- `mcp_manager.py` - MCP client lifecycle management
-- `mcp_config.json` - Server configuration
-- `langchain_mcp_adapters` for tool integration
-- Async patterns for MCP communication
+- `mcp_manager.py` - MCP client lifecycle management with async context managers
+  - `initialize_mcp_client()` - Creates and enters MCP client context
+  - `cleanup_mcp_client()` - Safely exits client (handles CancelledError)
+  - `load_mcp_config()` - Reads from `mcp_config.json`
+- `mcp_config.json` - Server configuration defining MCP servers and their settings
+- `mcp_prompt.py` - Specialized prompts for MCP-enabled agents
+- `langchain_mcp_adapters.client.MultiServerMCPClient` for tool integration
+- Async patterns for MCP communication (requires `nest_asyncio` for Jupyter compatibility)
+- MCP server implementations in `mcp_server/` subdirectories
 
 #### 4. Audio Processing Pipeline (ch11)
-- Modular pipeline: `AudioTranscriber` → `MeetingSummarizer`
-- Uses `faster-whisper` for speech recognition
-- Structured output generation with LLM prompts
+- LangGraph workflow with sequential nodes:
+  1. `validate_input` - Path validation
+  2. `transcribe` - Audio → text via Faster Whisper
+  3. `summarize` - Text → structured summary via LLM
+  4. `save_file` - Write markdown output
+- Components in `src/`:
+  - `transcriber.py` - `AudioTranscriber` class with lazy model loading
+  - `summarizer.py` - `MeetingSummarizer` with structured prompt templates
+  - `file_handler.py` - `FileHandler` for markdown generation
+  - `pipeline.py` - `MeetingNotesPipeline` orchestrating LangGraph workflow
+- State management via `MeetingState` TypedDict
+- Graph visualization saved as `graph.png` during initialization
 
 ### Common Dependencies
 - **LangChain ecosystem**: `langchain-core`, `langchain-ollama`, `langchain-community`
@@ -110,14 +143,24 @@ Most chapters follow this structure:
 
 ### Required Services
 - **Ollama**: Install and run locally for LLM inference
-- **Models**: Pull required models (e.g., `ollama pull qwen3:8b`)
+  - Download from https://ollama.com/download
+  - Start service (runs automatically on macOS/Windows, systemd on Linux)
+- **Models**: Pull required models before running projects
+  - `ollama pull qwen2.5:7b` (commonly used in early chapters)
+  - `ollama pull qwen3:8b` (used in ch11 and some ch09/ch10 projects)
+  - `ollama pull llama3:8b` (alternative for ch11)
 
 ### Environment Setup
-- Python 3.10+ (some projects require 3.12+)
-- UV package manager for dependency management
-- Optional: OpenAI API key for projects using GPT models
-- Optional: LangSmith API key for tracing (ch06)
-- Optional: Tavily API key for web search tools (ch08)
+- **Python 3.10+** (some projects require 3.12+)
+- **UV package manager** for dependency management
+  - Install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+  - UV replaces pip/venv and handles project dependencies via `pyproject.toml`
+
+### Optional API Keys (set in `.env` file)
+- **OpenAI API**: `OPENAI_API_KEY` - For projects using GPT models (some ch08-ch10 projects)
+- **LangSmith**: `LANGCHAIN_API_KEY` - For tracing and monitoring (ch06)
+- **Tavily**: `TAVILY_API_KEY` - For web search tools (ch07-ch08)
+- **Notion**: `NOTION_API_KEY` and `NOTION_DATABASE_ID` - For ch10/01_mcp_agent_notion
 
 ## Chapter-Specific Notes
 
@@ -181,17 +224,58 @@ uv run mypy .
 ```
 
 ### Code Style Guidelines
-Ch11 follows specific Korean coding conventions defined in `coding_rules.md`:
-- Comments and user interface in Korean
-- Snake_case for variables/functions, PascalCase for classes
-- Structured error handling with Korean error messages
-- F-string formatting preferred for all string interpolation
-- Sequential step numbering in comments (`# 1.`, `# 2.`, etc.)
+Ch11 follows specific Korean coding conventions defined in `ch11/coding_rules.md`:
+- **Language**: Comments, docstrings, and user-facing text in Korean; code identifiers in English
+- **Naming**: snake_case for variables/functions, PascalCase for classes, UPPER_SNAKE_CASE for constants
+- **Documentation**: Google-style docstrings in Korean with Args/Returns/Raises sections
+- **Error handling**: User-friendly Korean error messages with actionable solutions
+- **String formatting**: F-strings preferred over % or .format()
+- **Code organization**: Sequential step numbering in comments (`# 1.`, `# 2.`, etc.)
+- **Type hints**: Full type annotations using `typing` module (Optional, Dict, Any, etc.)
+- **Design patterns**: Lazy loading for heavy resources (models), class-based component design
+
+Note: Other chapters use English documentation and follow standard Python conventions.
+
+## Key Concepts by Chapter Type
+
+### Agent Creation Patterns
+- **ch07**: Uses `create_react_agent()` from LangChain with single/multiple tools
+- **ch08**: Uses `create_react_agent()` within LangGraph workflows with state management
+- **ch09-ch10**: Combines LangGraph + MCP tools via `langchain_mcp_adapters`
+  - Agent nodes created with `create_react_agent(model=chat_model, tools=mcp_tools)`
+  - Supervisor pattern for routing between specialized agents
+
+### State Management in LangGraph
+- Define state with `TypedDict` and `Annotated[list, add_messages]` for message handling
+- Create workflow with `StateGraph(StateClass)`
+- Add nodes with `graph_builder.add_node("node_name", node_function)`
+- Connect nodes with `add_edge()` for sequential flow or `add_conditional_edges()` for routing
+- Compile with `graph_builder.compile()` (optionally with `checkpointer` for memory)
+
+### Async Patterns (MCP Projects)
+```python
+# Standard MCP initialization pattern
+async def main():
+    client, tools = None, None
+    try:
+        client, tools = await initialize_mcp_client()
+        # Use tools with agent
+        agent = create_agent(mcp_tools=tools)
+        # Run agent
+        result = await agent.ainvoke(...)
+    finally:
+        await cleanup_mcp_client(client)
+
+# Entry point
+if __name__ == "__main__":
+    nest_asyncio.apply()  # For Jupyter compatibility
+    asyncio.run(main())
+```
 
 ## Learning Path Recommendations
 
 1. **Start with ch03** for basic LangChain concepts
-2. **Progress through ch04-ch05** for foundational patterns  
+2. **Progress through ch04-ch05** for foundational patterns
 3. **Use ch06** to understand observability early in development
 4. **Explore ch07-ch08** for agent architectures
 5. **Advance to ch09-ch10** for cutting-edge MCP integration
