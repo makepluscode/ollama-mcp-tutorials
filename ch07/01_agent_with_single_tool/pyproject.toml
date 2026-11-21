@@ -1,18 +1,11 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "ollama-mcp-tutorial"
+name = "ch07-agent-with-single-tool-mock"
 version = "0.1.0"
-description = "간단한 검색 에이전트 예제"
+description = "7장 기상학자 에이전트 목업 — 최신 LangChain을 설치하면 책 코드가 멈추는 상황을 재현해요"
 requires-python = ">=3.10"
+# 목업: 원본 예제는 langchain==0.3.25 로 고정돼 있어요.
+# 여기서는 독자가 최신 LangChain을 설치한 상황을 재현하려고 하한만 둬요.
 dependencies = [
-    "langchain-core==0.3.61",
-    "langchain-ollama==0.3.3",
-    "langchain==0.3.25",
-    "langchain-openai",
-    "python-dotenv",
-    "langchain-community",
-    "duckduckgo-search"
+    "langchain>=0.3.25",
+    "langchain-core>=0.3.61",
 ]
