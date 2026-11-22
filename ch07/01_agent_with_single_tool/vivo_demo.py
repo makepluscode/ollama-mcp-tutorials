@@ -59,3 +59,15 @@ def make_model(city):
         ),
         AIMessage(content=f"Final Answer: {city}: sunny, 22 C"),
     ])
+
+
+class EchoChatModel(FakeMessagesListChatModel):
+    """Answers with the prompt text it received, so the output proves the template was applied."""
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        text = " / ".join(str(m.content) for m in messages)
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content="기상학자 답변 ← " + text))])
+
+
+def make_chat_model():
+    return EchoChatModel(responses=[AIMessage(content="")])
